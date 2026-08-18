@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Lifethings — Rubber Band Interaction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-color: #ffffff;
+    --ink-color: #111111;
+    --muted-color: #888888;
+    --faint-color: #aaaaaa;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    max-width: 100vw;
+    height: 100vh;
+    height: 100dvh; /* accounts for mobile browser chrome; ignored where unsupported */
+    background: var(--bg-color);
+    color: var(--ink-color);
+    overflow: hidden;
+    overflow-x: hidden;
+    font-family: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    touch-action: none;
+  }
+
+  body {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas: "header" "main" "footer";
+  }
+
+  /* ---------------- Header ---------------- */
+  .site-header {
+    grid-area: header;
+    min-width: 0;
+    padding: clamp(16px, 4vw, 32px) clamp(16px, 5vw, 40px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    overflow: hidden;
+    z-index: 10;
+  }
+
+  .brand {
+    flex: 0 0 auto;
+    font-size: clamp(11px, 2.4vw, 13px);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    white-space: nowrap;
+  }
+
+  .site-header nav {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .categories {
+    display: flex;
+    align-items: center;
+    gap: clamp(12px, 2.6vw, 22px);
+    list-style: none;
+    margin: 0;
+    padding: 0 2px;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x; /* re-enable horizontal swipe here despite the page-wide touch-action: none */
+    scrollbar-width: none;
+  }
+
+  .categories::-webkit-scrollbar {
+    display: none;
+  }
+
+  .categories li {
+    flex: 0 0 auto;
+  }
+
+  .cat {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: clamp(9.5px, 2vw, 11px);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted-color);
+    cursor: pointer;
+    transition: color 0.25s ease;
+    white-space: nowrap;
+  }
+
+  .cat:hover,
+  .cat.active {
+    color: var(--ink-color);
+  }
+
+  /* ---------------- Main / Canvas ---------------- */
+  .stage {
+    grid-area: main;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px clamp(16px, 5vw, 40px);
+    touch-action: none;
+    overflow: hidden;
+  }
+
+  .canvas-wrap {
+    position: relative;
+    max-width: 100%;
+    max-height: 100%;
+    touch-action: none;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  .counter {
+    position: absolute;
+    top: -26px;
+    right: 0;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--muted-color);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+
+  .completion-msg {
+    position: absolute;
+    top: -26px;
+    left: 0;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--ink-color);
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+    pointer-events: none;
+  }
+
+  .completion-msg.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ---------------- Footer ---------------- */
+  .site-footer {
+    grid-area: footer;
+    min-width: 0;
+    padding: 0 clamp(16px, 5vw, 40px) clamp(16px, 4vw, 32px);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 8px 24px;
+    overflow: hidden;
+    z-index: 10;
+  }
+
+  .footer-left {
+    min-width: 0;
+    max-width: 460px;
+    flex: 1 1 240px;
+  }
+
+  .footer-title {
+    margin: 0;
+    font-size: clamp(10.5px, 2.2vw, 12px);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .footer-sub {
+    margin: 6px 0 0;
+    font-size: clamp(9.5px, 2vw, 11px);
+    line-height: 1.5;
+    color: var(--muted-color);
+  }
+
+  .footer-right {
+    flex: 0 1 320px;
+    max-width: 320px;
+    text-align: right;
+    font-size: clamp(8.5px, 1.8vw, 10px);
+    line-height: 1.5;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--faint-color);
+  }
+
+  /* ---------------- Responsive tweaks ---------------- */
+  /* Tablet and below: header/footer switch from a single row to a
+     stacked layout instead of just shrinking in place. */
+  @media (max-width: 780px) {
+    .site-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .site-header nav {
+      width: 100%;
+      justify-content: flex-start;
+    }
+
+    .site-footer {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .footer-left,
+    .footer-right {
+      flex: 1 1 auto;
+      max-width: 100%;
+    }
+
+    .footer-right {
+      text-align: left;
+    }
+  }
+
+  /* Phone: tighten spacing further */
+  @media (max-width: 420px) {
+    .site-header,
+    .site-footer {
+      gap: 8px;
+    }
+
+    .categories {
+      gap: 16px;
+    }
+  }
+
+  @media (max-height: 480px) {
+    .site-header {
+      padding-top: 12px;
+      padding-bottom: 12px;
+    }
+    .site-footer {
+      padding-bottom: 12px;
+    }
+    .footer-sub {
+      display: none;
+    }
+  }
+</style>
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="brand">Lifethings</div>
+    <nav>
+      <ul class="categories">
+        <li><button type="button" class="cat active">All</button></li>
+        <li><button type="button" class="cat">WIP</button></li>
+        <li><button type="button" class="cat">Office</button></li>
+        <li><button type="button" class="cat">Residential</button></li>
+        <li><button type="button" class="cat">Remodel</button></li>
+        <li><button type="button" class="cat">Interior</button></li>
+        <li><button type="button" class="cat">Religious</button></li>
+        <li><button type="button" class="cat">Commercial</button></li>
+        <li><button type="button" class="cat">Artwork</button></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="stage">
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="mainCanvas"></canvas>
+      <div class="counter" id="counter">0 / 0</div>
+      <div class="completion-msg" id="completionMsg">Structures fully actualized. Tap to begin again.</div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-left">
+      <p class="footer-title">Armin Hofmann "Rubber Band" Interaction</p>
+      <p class="footer-sub">Hover to expand nodes. Click and drag across gray circles<br>to reveal the hidden typography.</p>
+    </div>
+    <div class="footer-right">An interactive experiment revealing the essence of 'Lifethings'<br>through Armin Hofmann's elastic grid.</div>
+  </footer>
+
+  <script>
+  (function () {
+    const stage = document.querySelector('.stage');
+    const canvasWrap = document.getElementById('canvasWrap');
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+    const msg = document.getElementById('completionMsg');
+    const counterEl = document.getElementById('counter');
+
+    // Offscreen canvas used only to composite the rubber-band outline
+    const offCanvas = document.createElement('canvas');
+    const offCtx = offCanvas.getContext('2d');
+
+    // ---- Palette ---------------------------------------------------
+    // Plain JS strings, deliberately not "var(--bg-color)": <canvas>
+    // fillStyle/strokeStyle does not resolve CSS custom properties, so a
+    // var() string silently fails to parse and the context keeps its
+    // previous colour (which defaults to black on a fresh context).
+    const BG_COLOR = '#ffffff';
+    const INK_COLOR = '#111111';
+    const TARGET_COLOR = '#d8d8d8';
+
+    let width, height, dpr;
+    let SPACING = 30;
+    const COLS = 27;
+    const ROWS = 21;
+    const ASPECT = (COLS + 2) / (ROWS + 2); // matches the grid-fit padding used in resize()
+    const MAX_BOARD_WIDTH = 900;
+    let offsetX, offsetY;
+
+    // Peg radius as a fraction of grid spacing — kept small and light.
+    const NODE_SCALE = 0.20;
+
+    // Interaction state
+    const pointer = { x: -1000, y: -1000, isDown: false };
+    let isCompleted = false;
+    let completedAt = 0;
+    let snapValue = 0;
+    let snapVelocity = 0;
+
+    // Spring physics
+    const SPRING = 0.18;
+    const FRICTION = 0.72;
+
+    // Typography matrix (15 rows x 21 cols) spelling "life things"
+    const textMap = [
+      "00000 1 0 1 0 011 0 000 00000",
+      "00000 1 0 0 0 100 0 010 00000",
+      "00000 1 0 1 0 111 0 101 00000",
+      "00000 1 0 1 0 100 0 111 00000",
+      "00000 1 0 1 0 100 0 100 00000",
+      "00000 1 0 1 0 000 0 011 00000",
+      "00000 0 0 0 0 000 0 000 00000",
+      "00000 0 0 0 0 000 0 000 00000",
+      "010 0 100 0 1 0 000 0 000 0 000",
+      "111 0 100 0 0 0 000 0 000 0 000",
+      "010 0 110 0 1 0 110 0 011 0 011",
+      "010 0 101 0 1 0 101 0 101 0 100",
+      "001 0 101 0 1 0 101 0 011 0 010",
+      "000 0 000 0 0 0 000 0 001 0 001",
+      "000 0 000 0 0 0 000 0 010 0 110"
+    ].map(r => r.replace(/\s+/g, ''));
+
+    let grid = [];
+    let activatedEdges = [];
+    let totalTargets = 0;
+    let activatedCount = 0;
+
+    class Node {
+      constructor(r, c, isTarget) {
+        this.row = r;
+        this.col = c;
+        this.x = 0;
+        this.y = 0;
+        this.isTarget = isTarget;
+        this.isActivated = false;
+
+        this.baseR = 0;
+        this.targetR = 0;
+        this.currentR = 0;
+        this.velocity = 0;
+        this.shakePhase = Math.random() * Math.PI * 2;
+      }
+
+      updateLayout(spacing, ox, oy) {
+        this.x = ox + this.col * spacing;
+        this.y = oy + this.row * spacing;
+
+        // Uniform peg size — only fill colour marks background / hidden
+        // text / activated state.
+        this.baseR = spacing * NODE_SCALE;
+        this.targetR = this.isActivated ? spacing * NODE_SCALE : this.baseR;
+        if (this.currentR === 0) this.currentR = this.targetR;
+      }
+
+      update() {
+        if (this.isTarget && !this.isActivated) {
+          const dx = this.x - pointer.x;
+          const dy = this.y - pointer.y;
+          const dist = Math.hypot(dx, dy);
+          this.targetR = dist < SPACING * 1.3 ? SPACING * (NODE_SCALE * 1.22) : this.baseR;
+        }
+
+        const force = (this.targetR - this.currentR) * SPRING;
+        this.velocity = (this.velocity + force) * FRICTION;
+        this.currentR += this.velocity;
+      }
+
+      draw(ctx, now) {
+        let drawX = this.x;
+        let drawY = this.y;
+
+        // Background (non-target) pegs tremble when the cursor is near,
+        // instead of scaling like the hidden-text pegs do.
+        if (!this.isTarget) {
+          const dx = this.x - pointer.x;
+          const dy = this.y - pointer.y;
+          const dist = Math.hypot(dx, dy);
+          const range = SPACING * 1.1;
+
+          if (dist < range) {
+            const strength = 1 - dist / range;
+            const amp = SPACING * 0.11 * strength * strength; // eases in near the cursor
+            const t = now / 1000;
+            drawX += Math.sin(t * 22 + this.shakePhase) * amp;
+            drawY += Math.cos(t * 27 + this.shakePhase * 1.37) * amp * 0.8;
+          }
+        }
+
+        ctx.beginPath();
+        ctx.arc(drawX, drawY, Math.max(0.1, this.currentR), 0, Math.PI * 2);
+
+        if (this.isActivated) {
+          ctx.fillStyle = INK_COLOR;
+          ctx.fill();
+        } else if (this.isTarget) {
+          ctx.fillStyle = TARGET_COLOR;
+          ctx.fill();
+        } else {
+          ctx.strokeStyle = INK_COLOR;
+          ctx.lineWidth = Math.max(1, SPACING * 0.025);
+          ctx.stroke();
+        }
+      }
+    }
+
+    function init() {
+      grid = [];
+      totalTargets = 0;
+      activatedCount = 0;
+      isCompleted = false;
+      snapValue = 0;
+      snapVelocity = 0;
+      msg.classList.remove('visible');
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          let isTarget = false;
+          if (r >= 3 && r < 18 && c >= 3 && c < 24) {
+            const char = textMap[r - 3][c - 3];
+            if (char === '1') {
+              isTarget = true;
+              totalTargets++;
+            }
+          }
+          grid.push(new Node(r, c, isTarget));
+        }
+      }
+      updateCounter();
+      layoutCanvasWrap();
+    }
+
+    function layoutCanvasWrap() {
+      // Size the board from whichever of the stage's available width or
+      // height is more constraining, so the grid always uses the maximum
+      // legible space it can — wide desktop monitors get a wide board,
+      // narrow-tall phones get a board sized off the shorter dimension
+      // instead of being squeezed by a fixed aspect box that ignores the
+      // extra vertical room.
+      const rect = stage.getBoundingClientRect();
+      // Cross-checked against window.innerWidth/innerHeight directly, so
+      // a stale or momentarily-wrong DOM measurement (e.g. read before a
+      // late-loading web font finishes reflowing the header/footer) can
+      // never make the board wider than the actual visible screen.
+      const availW = Math.min(rect.width || Infinity, window.innerWidth);
+      const availH = Math.min(rect.height || Infinity, window.innerHeight);
+      if (availW <= 0 || availH <= 0) return;
+
+      let w = Math.min(availW, MAX_BOARD_WIDTH, availH * ASPECT);
+      let h = w / ASPECT;
+
+      canvasWrap.style.width = w + 'px';
+      canvasWrap.style.height = h + 'px';
+
+      resize();
+    }
+
+    function resize() {
+      const rect = canvasWrap.getBoundingClientRect();
+      width = rect.width;
+      height = rect.height;
+      if (width === 0 || height === 0) return;
+
+      dpr = window.devicePixelRatio || 1;
+
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      offCanvas.width = canvas.width;
+      offCanvas.height = canvas.height;
+
+      // setTransform (not scale) so repeated resize/observer callbacks
+      // never compound the DPR factor.
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      SPACING = Math.min(width / (COLS + 2), height / (ROWS + 2));
+      offsetX = (width - (COLS - 1) * SPACING) / 2;
+      offsetY = (height - (ROWS - 1) * SPACING) / 2;
+
+      grid.forEach(node => node.updateLayout(SPACING, offsetX, offsetY));
+    }
+
+    function extractEdges() {
+      activatedEdges = [];
+      for (let i = 0; i < grid.length; i++) {
+        if (!grid[i].isActivated) continue;
+        const r = grid[i].row;
+        const c = grid[i].col;
+
+        const checkNeighbor = (dr, dc) => {
+          const nr = r + dr;
+          const nc = c + dc;
+          if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+            const neighbor = grid[nr * COLS + nc];
+            if (neighbor.isActivated) {
+              activatedEdges.push({ n1: grid[i], n2: neighbor });
+            }
+          }
+        };
+
+        checkNeighbor(0, 1);
+        checkNeighbor(1, 0);
+        checkNeighbor(1, 1);
+        checkNeighbor(1, -1);
+      }
+    }
+
+    function updateCounter() {
+      counterEl.textContent = activatedCount + ' / ' + totalTargets;
+    }
+
+    function triggerCompletion() {
+      if (isCompleted) return;
+      isCompleted = true;
+      completedAt = performance.now();
+      msg.classList.add('visible');
+
+      // Kick every node's velocity for a "twang" — the ring's visible
+      // thickness also pulses briefly via snapValue (see render()), but
+      // its inner/merge-safe radius never changes, so the pulse can't
+      // flood the interior the way it used to.
+      for (const node of grid) {
+        node.velocity = node.isTarget ? -(SPACING * 0.22) : -(SPACING * 0.06);
+      }
+      snapValue = 1.0;
+    }
+
+    function handleInteraction() {
+      if (!pointer.isDown) return;
+
+      let updated = false;
+      for (const node of grid) {
+        if (node.isTarget && !node.isActivated) {
+          const dx = node.x - pointer.x;
+          const dy = node.y - pointer.y;
+          const dist = Math.hypot(dx, dy);
+
+          if (dist < SPACING * 0.85) {
+            node.isActivated = true;
+            node.targetR = SPACING * NODE_SCALE;
+            node.currentR = SPACING * (NODE_SCALE * 1.3);
+            activatedCount++;
+            updated = true;
+          }
+        }
+      }
+
+      if (updated) {
+        extractEdges();
+        updateCounter();
+        if (activatedCount === totalTargets) {
+          triggerCompletion();
+        }
+      }
+    }
+
+    function render() {
+      const now = performance.now();
+      ctx.fillStyle = BG_COLOR;
+      ctx.fillRect(0, 0, width, height);
+
+      handleInteraction();
+
+      if (isCompleted) {
+        snapVelocity += (0 - snapValue) * 0.12;
+        snapVelocity *= 0.78;
+        snapValue += snapVelocity;
+      }
+
+      grid.forEach(node => node.update());
+
+      // ------------------------------------------------------------
+      // Rubber band outline — wraps the OUTSIDE of the activated pegs
+      // only, leaving every peg visible in the open space it encloses.
+      // INNER_R is fixed comfortably above half the grid spacing so
+      // neighbouring rows/columns always merge into one continuous
+      // erase; only the thin OUTER ring pulses with the completion snap.
+      // ------------------------------------------------------------
+      const activeNodes = grid.filter(n => n.isActivated);
+
+      if (activeNodes.length > 0 && width && height) {
+        offCtx.clearRect(0, 0, width, height);
+
+        offCtx.beginPath();
+        for (const edge of activatedEdges) {
+          offCtx.moveTo(edge.n1.x, edge.n1.y);
+          offCtx.lineTo(edge.n2.x, edge.n2.y);
+        }
+        for (const node of activeNodes) {
+          offCtx.moveTo(node.x, node.y);
+          offCtx.lineTo(node.x, node.y + 0.001);
+        }
+        offCtx.lineCap = 'round';
+        offCtx.lineJoin = 'round';
+
+        const INNER_R = SPACING * 0.53;                  // reduced offset from pegs — still > SPACING/2, merge-safe
+        const RING = SPACING * 0.05 + snapValue * SPACING * 0.02; // thinner band + smaller snap pulse
+        const OUTER_R = INNER_R + RING;
+
+        offCtx.globalCompositeOperation = 'source-over';
+        offCtx.lineWidth = OUTER_R * 2;
+        offCtx.strokeStyle = INK_COLOR;
+        offCtx.stroke();
+
+        offCtx.globalCompositeOperation = 'destination-out';
+        offCtx.lineWidth = INNER_R * 2;
+        offCtx.stroke();
+        offCtx.globalCompositeOperation = 'source-over';
+
+        ctx.drawImage(offCanvas, 0, 0, width, height);
+      }
+
+      grid.forEach(node => node.draw(ctx, now));
+
+      requestAnimationFrame(render);
+    }
+
+    // ---- Events ------------------------------------------------------
+    function toLocal(e) {
+      const rect = canvas.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    // Re-layout whenever the stage's available box changes — covers
+    // window resize, orientation change, on-screen keyboard, mobile
+    // browser chrome (address bar) showing/hiding, and header/footer
+    // height changes from text wrapping.
+    const ro = new ResizeObserver(() => layoutCanvasWrap());
+    ro.observe(stage);
+    window.addEventListener('orientationchange', () => setTimeout(layoutCanvasWrap, 50));
+
+    // Pointer Events already unify mouse, touch, and pen — this is the
+    // single source of truth for interaction. touch-action: none (set on
+    // html/body and again directly on the canvas/stage above) is what
+    // actually stops the page from scrolling under a drag; the touchmove
+    // listener below is just a defensive fallback for browsers that need
+    // an explicit preventDefault as well.
+    canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+
+    canvas.addEventListener('pointerdown', (e) => {
+      pointer.isDown = true;
+      const p = toLocal(e);
+      pointer.x = p.x;
+      pointer.y = p.y;
+
+      if (isCompleted && performance.now() - completedAt > 500) {
+        init();
+      }
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      const p = toLocal(e);
+      pointer.x = p.x;
+      pointer.y = p.y;
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      pointer.isDown = false;
+      // Touch/pen have no real "hover" — without this, the last touched
+      // peg would stay scaled/shaking after the finger lifts. Mouse keeps
+      // tracking normally since it can still hover after button-up.
+      if (e.pointerType !== 'mouse') {
+        pointer.x = -1000;
+        pointer.y = -1000;
+      }
+    });
+
+    window.addEventListener('pointercancel', () => {
+      pointer.isDown = false;
+      pointer.x = -1000;
+      pointer.y = -1000;
+    });
+
+    window.addEventListener('pointerleave', () => {
+      pointer.isDown = false;
+      pointer.x = -1000;
+      pointer.y = -1000;
+    });
+
+    init();
+    render();
+
+    window.addEventListener('load', layoutCanvasWrap);
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(layoutCanvasWrap).catch(() => {});
+    }
+  })();
+  </script>
+</body>
+</html>
